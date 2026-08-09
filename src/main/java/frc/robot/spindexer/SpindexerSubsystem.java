@@ -12,22 +12,39 @@ public class SpindexerSubsystem extends SubsystemBase {
         motor.getConfigurator().apply(SpindexerConfig.motorConfiguration);
     }
 
+    /**
+     * Changes the motor speed
+     *
+     * @param speed input speed
+     */
     public void moveMotorSpeed(double speed) {
         motor.set(speed);
     }
 
+    /** Starts the motor */
     public void start() {
         moveMotorSpeed(SpindexerConfig.MOTOR_SPEED);
     }
 
+    /** Stops the motor */
     public void stop() {
         moveMotorSpeed(0);
     }
 
+    /**
+     * Gets the current motor speed
+     *
+     * @return the motor speed
+     */
     public double getMotorSpeed() {
         return motor.get();
     }
 
+    /**
+     * Gets the angular velocity
+     *
+     * @return the angular velocity as a double
+     */
     public double getAngularVelocity() {
         return motor.getVelocity().getValueAsDouble();
     }

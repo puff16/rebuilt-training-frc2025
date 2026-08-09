@@ -13,6 +13,4 @@ public class SpindexerConfig {
         motorConfiguration.MotorOutput.NeutralMode = NeutralModeValue.Coast;
         motorConfiguration.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     }
-
-
 }
