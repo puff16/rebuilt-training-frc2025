@@ -69,6 +69,10 @@ WPILib is the software suite containing all necessary packages and applications 
         - [Hood Subsystem](#hood-subsystem)
             - [Hood Specifications](#hood-specifications)
             - [Recording the Setpoint](#recording-the-setpoint)
+        - [Shooter Subsystem](#shooter-subsystem)
+            - [Leader and Follower Motors](#leader-and-follower-motors)
+            - [Configuring Shooter Motors](#configuring-shooter-motors)
+            - [Shooter Movement Methods](#shooter-movement-methods)
 - [Temporary End](#temporary-end)
 
 ## Attribution
@@ -1143,6 +1147,87 @@ Then use `targetPitch` to add a new dashboard property.
 In general, these setpoint fields should be used for any movement that uses a control request instead of `set()` or `setVoltage()` methods.
 
 Once you are done with this, go back to `IntakeSubsystem` and implement a setpoint field and dashboard property for the angle.
+
+#### Shooter Subsystem
+The shooter subsystem has two motors both connected to the same axle, to provide extra force for launching the fuel using flywheels.
+
+The CAN bus for both motors is the `launcher` one.
+
+##### Leader and Follower Motors
+Before we start on the shooter subsystem, we have to learn how leader and follower motors work.
+
+With `TalonFX`, you can designate certain motors as leaders and certain motors as followers. Leader motors are controlled directly by the program, while follower motors automatically mirror what the leader does (voltage, duty cycle, `MotionMagicVoltage`).
+
+This is much more reliable than manually setting both motors to be the exact same output and makes it easier to write subsystems where the motors move in sync, like our double motor shooter.
+
+The follower can either be set to go in the same direction or opposite direction as the leader.
+
+In our case, if the shooter motors don't apply the same output or go in the wrong directions, it may break the mechanism or motors.
+
+Use the `Follower` control request on the follower motor, immediately in the subsystem constructor, to set a leader and follower.
+
+##### Configuring Shooter Motors
+The shooter subsystem will have two `TalonFX` motor fields, `rightLeaderMotor` and `leftFollowerMotor`. Each can be initialized with their respective motor IDs and the same CAN bus from `ShooterConst.java`.
+
+Both motors will use the same motor configuration, `motorConfig`, in `ShooterConfig.java`. Make sure to set both current limits. Since they are flywheels, coast is best here.
+
+Note: The positive direction is set to whatever would be the "shooting" direction for the leader motor (in this case the right shooter motor).
+
+Create a constructor for `ShooterSubsystem` and apply this configuration to the left and right motors. Since we want them to be leader and follower, there is one additional configuration step to take. Beneath where you applied the motor configuration, add this line:
+
+```java
+leftFollowerMotor.setControl(
+new Follower(rightLeaderMotor.getDeviceID(), MotorAlignmentValue.Opposed));
+```
+
+We call the `setControl()` method on a follower motor to specify how we want it to behave. The first parameter is the ID of the leader motor it should listen to, and the second dictates if it will spin in the same or opposite direction to its follower. In order to shoot fuel properly, the left motor will have to invert  the direction of the right (`MotorAlignmentValue.Opposed`).
+
+##### Shooter Movement Methods
+To start, make a field to store the target angular velocity of the shooter subsystem at all times. The type is `AngularVelocity`.
+
+Then, we need to make a method that sets the shooter motors to any desired velocity. Create a method called `moveAngularVelocity` that updates the value of `targetAngularVelocity` and sets the right leader motor to a specific speed (the left does not need to be set, it will mirror automatically). Ensure that the magnitude of this velocity is within the shooter's limitations (`MAX_ANGULAR_VELOCITY`).
+
+Create a method `stop()` that stops the shooter motors and updates `targetVelocity` accordingly.
+
+We may want to be able to enable and disable the shooter independently of the rest of the launcher assembly, for testing purposes or streamlining commands. Underneath where you created the `targetAngularVelocity` field, add a field that can track whether the shooter subsystem is enabled or not.
+
+In your `moveAngularVelocity()` method, add a check to see if the shooter subsystem is enabled. If it is disabled, prevent the motors from moving.
+
+Next, you'll want to make a getter method for the shooter's angular velocity. While we could use `motor.get()` to retrieve the speed as a fraction between `-1.0` and `1.0`, we want a more specific value so we can better test our shooter. For this, we can use the `getVelocity()` method in place of `get()`, which returns the motor's velocity in rotations per second (rps) instead. 
+
+Remember that `getVelocity()` returns a `StatusSymbol<AngularVelocity>` value that you'll have to convert into `AngularVelocity` with `getValue()`.
+
+Your method should look like this:
+```java
+public AngularVelocity getAngularVelocity() {
+return rightLeaderMotor.getVelocity().getValue();
+}
+```
+
+Add both the shooter's angular velocity (using `getAngularVelocity()`) and the recorded `targetAngularVelocity` into an `initSendable()` method. Remember to convert the values you pass in to rps using the Units library (`.in(RotationsPerSecond)`).
+
+The retrieved angular velocity should not have a setter passed in, but the target angular velocity field should. Use a lambda expression to pass an inputted angular velocity into the `moveAngularVelocity()` method.
+
+Also add the `enabled` property to your `initSendable()`. You can do this with the `addBooleanProperty()` method. For the getter, use a lambda expression that takes in no parameters and checks the value of `enabled`. The setter should also be a lambda expression, one that takes in a parameter `enabled`, checks if it is true, and updates the value of 'enabled' accordingly.
+
+<details><summary> All properties should look like this: </summary>
+
+```java
+       builder.addDoubleProperty(
+                "angular velocity (RPS)", () -> getAngularVelocity().in(RotationsPerSecond), null);
+        builder.addDoubleProperty(
+                "target angular velocity (RPS)",
+                () -> targetAngularVelocity.in(RotationsPerSecond),
+                (double angularVelocity) -> moveAngularVelocity(RotationsPerSecond.of(angularVelocity)));
+        builder.addBooleanProperty(
+                "enabled",
+                () -> enabled,
+                (enable) -> {
+                    if (enable) enabled = true;
+                    else enabled = false;
+                });
+```
+</details>
 
 ## Temporary End
 The rest of training is being actively written.
