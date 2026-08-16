@@ -8,6 +8,9 @@ Trainees, please go to [`TRAINING.md`](TRAINING.md)
 
 ### Xbox Controller Bindings
 (Add documented controls here)
+Left Bumper spins the spindexer
+D-Pad down deploys the intake
+D-Pad up stows the intake
 
 ### SmartDashboard Mappings
 What each control is in SmartDashboard, in Keyboard Settings.
